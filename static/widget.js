@@ -1,7 +1,7 @@
 /**
  * Chatbot Embed Widget - file statis murni, tanpa build step.
  * Pemakaian:
- *   <script src="https://domain-kamu.com/widget.js" data-api-key="demo123456"></script>
+ *   <script src="https://chatbot-psi-seven-4pioiv8axu.vercel.app/widget.js" data-api-key="demo123456"></script>
  */
 (function () {
   var script = document.currentScript;
