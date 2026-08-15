@@ -244,6 +244,15 @@ def health():
     return {"status": "ok"}
 
 
-static_path = os.path.join(BASE_DIR, "static")
-if os.path.exists(static_path):
-    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
+# ===================== STATIC & HEALTH =====================
+@app.get("/widget.js")
+def serve_widget():
+    widget_path = os.path.join(BASE_DIR, "static", "widget.js")
+    if not os.path.exists(widget_path):
+        widget_path = os.path.join(BASE_DIR, "widget.js")
+    return FileResponse(widget_path, media_type="application/javascript")
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
