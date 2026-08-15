@@ -86,7 +86,7 @@ def cari_jawaban(pesan: str, faqs: List[dict]) -> Optional[str]:
 
 # ===================== WIDGET (publik) =====================
 @app.get("/api/widget/config")
-def widget_config(api_key: str):
+def widget_config(api_key: str = Query(...)):
     p = get_profile_by_key(api_key)
     return {
         "bot_name": p["bot_name"],
@@ -120,12 +120,12 @@ def chat(body: ChatIn):
 
 # ===================== ADMIN: PROFILE =====================
 @app.get("/api/profile")
-def get_profile(api_key: str):
+def get_profile(api_key: str = Query(...)):
     return get_profile_by_key(api_key)
 
 
 @app.put("/api/profile")
-def update_profile(api_key: str, body: ProfileIn):
+def update_profile(body: ProfileIn, api_key: str = Query(...)):
     profile = get_profile_by_key(api_key)
     res = (
         supabase.table("profiles")
@@ -138,7 +138,7 @@ def update_profile(api_key: str, body: ProfileIn):
 
 # ===================== ADMIN: FAQ CRUD =====================
 @app.get("/api/faqs")
-def list_faqs(api_key: str):
+def list_faqs(api_key: str = Query(...)):
     profile = get_profile_by_key(api_key)
     return (
         supabase.table("faqs")
@@ -152,7 +152,7 @@ def list_faqs(api_key: str):
 
 
 @app.post("/api/faqs")
-def create_faq(api_key: str, body: FaqIn):
+def create_faq(body: FaqIn, api_key: str = Query(...)):
     profile = get_profile_by_key(api_key)
     kw = format_keywords(body.keywords)
     cat = body.category or ""
@@ -172,7 +172,7 @@ def create_faq(api_key: str, body: FaqIn):
 
 
 @app.put("/api/faqs/{faq_id}")
-def update_faq(faq_id: int, api_key: str, body: FaqIn):
+def update_faq(faq_id: int, body: FaqIn, api_key: str = Query(...)):
     profile = get_profile_by_key(api_key)
     kw = format_keywords(body.keywords)
     cat = body.category or ""
@@ -197,7 +197,7 @@ def update_faq(faq_id: int, api_key: str, body: FaqIn):
 
 
 @app.delete("/api/faqs/{faq_id}")
-def delete_faq(faq_id: int, api_key: str):
+def delete_faq(faq_id: int, api_key: str = Query(...)):
     profile = get_profile_by_key(api_key)
     supabase.table("faqs").delete().eq("id", faq_id).eq(
         "profile_id", profile["id"]
@@ -207,7 +207,7 @@ def delete_faq(faq_id: int, api_key: str):
 
 # ===================== ADMIN: LOGS =====================
 @app.get("/api/logs")
-def list_logs(api_key: str):
+def list_logs(api_key: str = Query(...)):
     profile = get_profile_by_key(api_key)
     return (
         supabase.table("unanswered_logs")
@@ -222,7 +222,7 @@ def list_logs(api_key: str):
 
 
 @app.delete("/api/logs/{log_id}")
-def delete_log(log_id: int, api_key: str):
+def delete_log(log_id: int, api_key: str = Query(...)):
     profile = get_profile_by_key(api_key)
     supabase.table("unanswered_logs").delete().eq("id", log_id).eq(
         "profile_id", profile["id"]
@@ -233,9 +233,10 @@ def delete_log(log_id: int, api_key: str):
 # ===================== STATIC =====================
 @app.get("/widget.js")
 def serve_widget():
-    return FileResponse(
-        os.path.join(BASE_DIR, "static", "widget.js"), media_type="application/javascript"
-    )
+    widget_path = os.path.join(BASE_DIR, "static", "widget.js")
+    if not os.path.exists(widget_path):
+        widget_path = os.path.join(BASE_DIR, "widget.js")
+    return FileResponse(widget_path, media_type="application/javascript")
 
 
 @app.get("/health")
@@ -243,7 +244,6 @@ def health():
     return {"status": "ok"}
 
 
-# Mount static files jika ada folder static
 static_path = os.path.join(BASE_DIR, "static")
 if os.path.exists(static_path):
     app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
