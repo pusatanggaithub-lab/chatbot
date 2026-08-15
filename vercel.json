@@ -13,6 +13,10 @@
     {
       "src": "/widget.js",
       "dest": "main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }
