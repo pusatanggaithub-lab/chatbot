@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kelola FAQ — Dashboard Chatbot</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<div class="max-w-4xl mx-auto p-6">
+  <header class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <h1 class="text-xl font-bold">Dashboard Chatbot</h1>
+    <div id="keybox" class="flex gap-2"></div>
+  </header>
+  <nav id="nav" class="flex flex-wrap gap-1 mb-6 bg-white p-1.5 rounded-xl border border-slate-200"></nav>
+
+  <section class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+    <h2 class="font-semibold mb-3" id="formTitle">Tambah FAQ</h2>
+    <form id="faqForm" class="grid gap-3">
+      <input type="hidden" id="faqId" />
+      <input id="kategori" placeholder="Kategori (mis. Jam Operasional)" required
+        class="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+      <input id="keywords" placeholder="Keywords, pisahkan dengan koma"
+        class="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+      <textarea id="jawaban" placeholder="Jawaban bot" rows="3" required
+        class="border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+      <div class="flex gap-2">
+        <button class="bg-teal-700 text-white text-sm px-4 py-2 rounded-lg">Simpan</button>
+        <button type="button" id="cancelEdit" class="hidden text-sm px-4 py-2 rounded-lg border border-slate-300">Batal</button>
+      </div>
+    </form>
+  </section>
+
+  <div id="list" class="grid gap-3"></div>
+</div>
+<div id="toast" style="display:none"></div>
+
+<script src="app.js"></script>
+<script>
+renderShell('index.html');
+
+const form = document.getElementById('faqForm');
+const listEl = document.getElementById('list');
+
+async function load() {
+  try {
+    const faqs = await api('/api/faqs');
+    listEl.innerHTML = faqs.length ? '' : '<p class="text-sm text-slate-500">Belum ada FAQ.</p>';
+    faqs.forEach((f) => {
+      const card = document.createElement('div');
+      card.className = 'bg-white border border-slate-200 rounded-xl p-4';
+      card.innerHTML = `
+        <div class="flex justify-between gap-3">
+          <div>
+            <p class="font-semibold text-sm">${f.kategori}</p>
+            <p class="text-sm text-slate-600 mt-1">${f.jawaban}</p>
+            <p class="text-xs text-slate-400 mt-2">${(f.keywords || []).join(', ')}</p>
+          </div>
+          <div class="flex flex-col gap-1 shrink-0">
+            <button class="text-xs px-3 py-1 rounded border border-slate-300" data-edit="${f.id}">Edit</button>
+            <button class="text-xs px-3 py-1 rounded border border-red-300 text-red-600" data-del="${f.id}">Hapus</button>
+          </div>
+        </div>`;
+      card.querySelector('[data-edit]').onclick = () => {
+        faqId.value = f.id; kategori.value = f.kategori;
+        keywords.value = (f.keywords || []).join(', '); jawaban.value = f.jawaban;
+        formTitle.textContent = 'Edit FAQ'; cancelEdit.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+      card.querySelector('[data-del]').onclick = async () => {
+        if (!confirm('Hapus FAQ ini?')) return;
+        await api(`/api/faqs/${f.id}`, { method: 'DELETE' });
+        toast('FAQ dihapus'); load();
+      };
+      listEl.appendChild(card);
+    });
+  } catch (e) { toast(e.message, false); }
+}
+
+function resetForm() {
+  form.reset(); faqId.value = '';
+  formTitle.textContent = 'Tambah FAQ'; cancelEdit.classList.add('hidden');
+}
+cancelEdit.onclick = resetForm;
+
+form.onsubmit = async (e) => {
+  e.preventDefault();
+  const body = {
+    kategori: kategori.value,
+    keywords: keywords.value.split(',').map((s) => s.trim()).filter(Boolean),
+    jawaban: jawaban.value,
+  };
+  try {
+    if (faqId.value) {
+      await api(`/api/faqs/${faqId.value}`, { method: 'PUT', body: JSON.stringify(body) });
+    } else {
+      await api('/api/faqs', { method: 'POST', body: JSON.stringify(body) });
+    }
+    toast('Tersimpan'); resetForm(); load();
+  } catch (e) { toast(e.message, false); }
+};
+
+load();
+</script>
+</body>
+</html>
