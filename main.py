@@ -1,17 +1,16 @@
 """
 Chatbot Embed - Backend FastAPI + Supabase
-Jalankan lokal:  uvicorn main:app --reload --port 8000
 """
 
 import os
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from supabase import create_client
 
 load_dotenv()
@@ -37,10 +36,12 @@ app.add_middleware(
 
 # ===================== MODELS =====================
 class FaqIn(BaseModel):
-    profile_id: str
-    kategori: str
-    keywords: List[str] = []
-    jawaban: str
+    category: Optional[str] = Field(None, alias="kategori")
+    keywords: Union[List[str], str] = []
+    answer: Optional[str] = Field(None, alias="jawaban")
+
+    class Config:
+        populate_by_name = True
 
 
 class ProfileIn(BaseModel):
@@ -65,12 +66,21 @@ def get_profile_by_key(api_key: str) -> dict:
     return res.data[0]
 
 
+def format_keywords(keywords: Union[List[str], str]) -> List[str]:
+    if isinstance(keywords, str):
+        return [k.strip() for k in keywords.split(",") if k.strip()]
+    return keywords
+
+
 def cari_jawaban(pesan: str, faqs: List[dict]) -> Optional[str]:
     pesan_lower = pesan.lower()
     for item in faqs:
-        for keyword in item.get("keywords") or []:
+        kw_list = item.get("keywords") or []
+        if isinstance(kw_list, str):
+            kw_list = [k.strip() for k in kw_list.split(",") if k.strip()]
+        for keyword in kw_list:
             if keyword and keyword.lower() in pesan_lower:
-                return item["jawaban"]
+                return item.get("answer") or item.get("jawaban")
     return None
 
 
@@ -144,17 +154,38 @@ def list_faqs(api_key: str):
 @app.post("/api/faqs")
 def create_faq(api_key: str, body: FaqIn):
     profile = get_profile_by_key(api_key)
-    payload = body.model_dump()
-    payload["profile_id"] = profile["id"]
+    kw = format_keywords(body.keywords)
+    cat = body.category or ""
+    ans = body.answer or ""
+
+    payload = {
+        "profile_id": profile["id"],
+        "category": cat,
+        "kategori": cat,
+        "keywords": kw,
+        "answer": ans,
+        "jawaban": ans,
+    }
+
     res = supabase.table("faqs").insert(payload).execute()
-    return res.data[0]
+    return res.data[0] if res.data else {"status": "success"}
 
 
 @app.put("/api/faqs/{faq_id}")
 def update_faq(faq_id: int, api_key: str, body: FaqIn):
     profile = get_profile_by_key(api_key)
-    payload = body.model_dump()
-    payload["profile_id"] = profile["id"]
+    kw = format_keywords(body.keywords)
+    cat = body.category or ""
+    ans = body.answer or ""
+
+    payload = {
+        "category": cat,
+        "kategori": cat,
+        "keywords": kw,
+        "answer": ans,
+        "jawaban": ans,
+    }
+
     res = (
         supabase.table("faqs")
         .update(payload)
@@ -162,9 +193,7 @@ def update_faq(faq_id: int, api_key: str, body: FaqIn):
         .eq("profile_id", profile["id"])
         .execute()
     )
-    if not res.data:
-        raise HTTPException(status_code=404, detail="FAQ tidak ditemukan")
-    return res.data[0]
+    return res.data[0] if res.data else {"status": "success"}
 
 
 @app.delete("/api/faqs/{faq_id}")
@@ -214,4 +243,7 @@ def health():
     return {"status": "ok"}
 
 
-app.mount("/", StaticFiles(directory=os.path.join(BASE_DIR, "static"), html=True), name="static")
+# Mount static files jika ada folder static
+static_path = os.path.join(BASE_DIR, "static")
+if os.path.exists(static_path):
+    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
